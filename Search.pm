@@ -17,7 +17,7 @@ require AutoLoader;
 @EXPORT = qw(
 	
 );
-$VERSION = '0.02';
+$VERSION = '0.04';
 
   
 for my $attr (qw( query field_id start limit form_fields dbh 
@@ -64,7 +64,33 @@ sub new {
 
 
 	$self->{start}=0 if exists $self->{limit} and not exists $self->{start};
-	return bless $self,$class;
+	bless $self,$class;
+	$self->n_rows;
+	return $self;
+}
+
+sub header {
+	my $self=shift;
+	my ($text,$previous,$next)=@_;
+	$text=$self->current_start."  - ".
+			$self->current_end.
+			'( '.$self->n_rows.')' unless defined $text;
+	$previous="previous" unless defined $previous;
+	$next = "next" unless defined $next;
+	my $ret = "<TABLE><TR><TD>$text</TD>";
+	if ($self->current_start > 1) {
+		$ret.="<TD>".$self->prev(submit => "<INPUT TYPE=\"IMAGE\"
+                                                SRC=\"/img/prev.gif\"
+                                               NAME=\"$previous\" BORDER=0>").
+				"</TD>";
+	}
+	if ($self->current_end < $self->n_rows) {
+		$ret.="<TD>".$self->next(submit => "<INPUT TYPE=\"IMAGE\"
+                                                SRC=\"/img/next.gif\"
+                                               NAME=\"$next\" BORDER=0>").
+				"</TD>";
+	}
+	return "$ret</TR></TABLE>";
 }
 
 sub prev {
@@ -158,15 +184,44 @@ sub n_rows {
 	$self->{current_end}=$self->{start}+$self->{limit};
 	$self->{current_end}=$self->{n_rows}
 		if $self->{n_rows}<$self->{current_end};
-	$self->{current_start}=($self->{start} or 1);
+	$self->{current_start}=($self->{start} + 1);
 	return $self->{n_rows};
+}
+
+sub fetchrow_hashref {
+	my $self=shift;
+        if (defined $self->{sth}) {
+                return if $self->{dbh}->{Driver}->{Name} ne "mysql"
+                                and ($self->{current} > ($self->{start} 
+					+ $self->{limit}));
+                $self->{current}++;
+                return $self->{sth}->fetchrow_hashref;
+        }
+        my $query=$self->{query};
+        $query.=" LIMIT ".$self->{start}.",".$self->{limit}
+                if defined $self->{limit} and $self->{dbh}->{Driver}->{Name} eq "mysql";
+        $self->{sth}=$self->{dbh}->prepare($query) or die $DBI::errstr;
+        $self->{sth}->execute or die $DBI::errstr;
+        my $row;
+        $self->{current}=0;
+        while ($row=$self->{sth}->fetchrow_hashref) {
+                last if $self->{dbh}->{Driver}->{Name} eq "mysql";
+                next if $self->{dbh}->{Driver}->{Name} ne "mysql"
+                                and ($self->{current}++ < $self->{start});
+                last if $self->{dbh}->{Driver}->{Name} ne "mysql"
+                                and ($self->{current} > ($self->{start} 
+								+ $self->{limit}));
+                last if $self->{dbh}->{Driver}->{Name} ne "mysql";
+        }
+        return $row;
 }
 
 sub fetchrow {
 	my $self=shift;
 	if (defined $self->{sth}) {
 		return if $self->{dbh}->{Driver}->{Name} ne "mysql"
-				and ($self->{current} > ($self->{start} + $self->{limit}));
+				and ($self->{current} > ($self->{start} 
+							+ $self->{limit}));
 		$self->{current}++;
 		return $self->{sth}->fetchrow;
 	}
@@ -183,6 +238,7 @@ sub fetchrow {
 				and ($self->{current}++ < $self->{start});
 		last if $self->{dbh}->{Driver}->{Name} ne "mysql"
 				and ($self->{current} > ($self->{start} + $self->{limit}));
+		last if $self->{dbh}->{Driver}->{Name} ne "mysql";
 	}
 	return @row;
 }
@@ -262,14 +318,16 @@ HTML::Widgets::Search - Perl module for building searches returning HTML
                         " FROM customers WHERE name LIKE 'a%' ".
                         " ORDER BY name                       ",
             field_id => "idCustomer",
-               limit => "10",
-         form_fields => \%fields,
+               limit => 10,
+         form_fields => \%ARGS,
                  dbh => $dbh
     );
     </%perl>
 
 	<% $search->n_found %> customers found
 	<% $search->current_start %> to <% $search -> current_end %><BR>
+
+	<% $search->head %>
     <TABLE WIDTH="90%">
         <%perl>
              $search->render_table(

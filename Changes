@@ -1,5 +1,9 @@
 Revision history for Perl extension HTML::Widgets::Search.
 
+0.04	Fri May 26 16:33:31 MET DST 2000
+	- Added a very cool header method
+	- It works with SQL-Server 6.5, granted !
+
 0.02	Tue Feb  1 10:50:38 CET 2000
 	- Added post form for prev and next
 	- Added functions : current_end and current start
