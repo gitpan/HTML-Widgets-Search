@@ -5,7 +5,7 @@ use DBI;
 use URI;
 use Carp;
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %FIELD_OK $AUTOLOAD 
-			%FIELD_READ_ONLY);
+			%FIELD_READ_ONLY $DEBUG);
 
 require Exporter;
 require AutoLoader;
@@ -17,11 +17,11 @@ require AutoLoader;
 @EXPORT = qw(
 	
 );
-$VERSION = '0.04';
+$VERSION = '0.05';
 
   
-for my $attr (qw( query field_id start limit form_fields dbh 
-					current_start current_end spanish_date)) {
+for my $attr (qw( query field_id start limit form_fields dbh DEBUG
+		current_start current_end spanish_date)) {
 	$FIELD_OK{$attr}++; # Los ponemos en ok
 }
 
@@ -117,23 +117,63 @@ sub prev_link {
 	return $uri->as_string();
 }
 
+sub href {
+
+	my $self=shift;
+	my %args=@_;
+	my $link_args;
+	my $uri;
+	if (exists $args{uri}) {
+		$uri=URI->new($args{uri});
+		$link_args=$args{args};
+	} else {
+		$uri=URI->new($ENV{REQUEST_URI});
+		$link_args=\%args
+	}
+    $link_args->{_limit}=$self->{limit} if exists $self->{limit};
+    $link_args->{_start}=$self->{start};
+	$uri->query_form(%$link_args);
+	return $uri->as_string();
+}
+
 sub form_args_html {
 	my $self=shift;
+	return '<form method="post">'.$self->args_html(@_)."</form>";
+
+}
+
+sub args_html {
+	my $self=shift;
 	my %arg=@_;
-	my $ret='<FORM METHOD="POST">';
+	$arg{start}=$self->{start} unless exists $arg{start};
+	my $ret='';
 	foreach (keys %{$self->{form_fields}}) {
 		next unless length $self->{form_fields}->{$_};
 		next unless /^[a-z0-9_]*$/i; # must be a valid SQL table field name
 		$ret.="<INPUT TYPE=HIDDEN NAME=\"$_\" ".
 				" VALUE=\"$self->{form_fields}->{$_}\">";
 	}
-	return $ret.$arg{submit}.
-		" <INPUT TYPE=\"HIDDEN\" NAME=\"_start\" 
-								VALUE=\"$arg{start}\">".
-		" <INPUT TYPE=\"HIDDEN\" NAME=\"_limit\"
-								VALUE=\"$self->{limit}\">".
-		"</FORM>";
+	foreach (keys %{$arg{hidden}}) {
+		$ret.="<INPUT TYPE=\"HIDDEN\" NAME=\"$_\"	".
+				" VALUE =\"$arg{hidden}->{$_}\">\n"
+	}
+    $ret.='<INPUT TYPE="HIDDEN" NAME="_start"'.
+            " VALUE=\"$arg{start}\">";
+    $ret.=" <INPUT TYPE=\"HIDDEN\" NAME=\"_limit\"".
+            " VALUE=\"$self->{limit}\">" if exists $self->{limit};
+
+	$ret.=$arg{submit} if exists $arg{submit};
+
+	return $ret;
 	
+}
+
+
+sub html_form_fields {
+	my $self=shift;
+	return $self->args_html(
+		start => $self->{start}
+	);
 }
 
 sub next_link_post {
@@ -145,6 +185,7 @@ sub next_link_post {
 							start => $self->{start}+$self->{limit}
 	);
 }
+
 
 sub prev_link_post {
 	my $self=shift;
@@ -176,7 +217,10 @@ sub n_rows {
 	return $self->{n_rows} if exists $self->{n_rows};
 	my $query=$self->{query};
 	$query=~s/\n//g;
-	$query=~s/(\s*SELECT).*?(FROM .*$)/$1 count(*) $2/i; 
+	$query=~s/(\s*SELECT)\s+(.*?)\s+(FROM .*$)/$1 count($2) $3/i; 
+	$query=~s/order by.*//i;
+	$query =~ s/count\((.*?,.*?)\)/count(*)/;
+	warn $query if $DEBUG;
 	my $sth=$self->{dbh}->prepare($query) or die $DBI::errstr;
 	$sth->execute or die $DBI::errstr;
 	($self->{n_rows}) = $sth->fetchrow;
@@ -200,6 +244,7 @@ sub fetchrow_hashref {
         my $query=$self->{query};
         $query.=" LIMIT ".$self->{start}.",".$self->{limit}
                 if defined $self->{limit} and $self->{dbh}->{Driver}->{Name} eq "mysql";
+		warn $query if $DEBUG;
         $self->{sth}=$self->{dbh}->prepare($query) or die $DBI::errstr;
         $self->{sth}->execute or die $DBI::errstr;
         my $row;
@@ -228,8 +273,9 @@ sub fetchrow {
 	my $query=$self->{query};
 	$query.=" LIMIT ".$self->{start}.",".$self->{limit}
 		if defined $self->{limit} and $self->{dbh}->{Driver}->{Name} eq "mysql";
+	warn $query if $DEBUG;
 	$self->{sth}=$self->{dbh}->prepare($query) or die $DBI::errstr;
-	$self->{sth}->execute or die $DBI::errstr;
+	$self->{sth}->execute or die ("\n$query\n\t$DBI::errstr");
 	my @row;
 	$self->{current}=0;
 	while (@row=$self->{sth}->fetchrow) {
@@ -249,6 +295,7 @@ sub render_table {
 	my $query=$self->{query};
 	$query.=" LIMIT ".$self->{start}.",".$self->{limit}
 		if defined $self->{limit} and $self->{dbh}->{Driver}->{Name} eq "mysql";
+	warn $query if $DEBUG;
 	my $sth=$self->{dbh}->prepare($query) or die $DBI::errstr;
 	my $html="";
 	$sth->execute or die $DBI::errstr;
@@ -373,6 +420,59 @@ HTML::Widgets::Search - Perl module for building searches returning HTML
 	Give it a try, the synopsis may help you start.
 	Let me know if it's useful for or whatever you want to tell me.
 	
+
+=head1 METHODS
+
+=over
+
+=item *
+B<html_form_fields> : Returns the hidden fields necessary if you want to make a form
+yourself.
+
+I<Example:>
+
+  <form method="post">
+
+     <input type="submit">
+
+     <% $search -> html_form_fields %>
+
+  </form>
+
+
+If you don't add the I<html_form_fields> method the search will the
+reset to the very first position. Doing it like the example the search
+current position will be kept. I don't know how to explain better,
+please gimme a hint.
+
+=item *
+B<href> : returns a I<href> html tag with the params you send and
+	the params needed to reload the current state of the search
+
+I<Example:>
+
+  $search->href( name1 => 'value1' , name2 => 'value2' )
+
+    returns:
+
+  <a href="current_page.html?name1=value1&...I<current state params>">
+
+So the current page will be reloaded with some new values in some arguments.
+
+
+If you don't want to call the current page you must call it this way:
+
+   $search-> href( url => 'http://another_site/cgi-bin/file.cgi',
+                   args => {
+						name1 => 'value1',
+						name2 => 'value2'
+                   }
+   );
+
+
+
+
+=back
 
 
 =head1 TODO

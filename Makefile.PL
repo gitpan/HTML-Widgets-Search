@@ -4,4 +4,7 @@ use ExtUtils::MakeMaker;
 WriteMakefile(
     'NAME'	=> 'HTML::Widgets::Search',
     'VERSION_FROM' => 'Search.pm', # finds $VERSION
+	PREREQ_PM => {
+		DBI => '0.7'
+	}
 );

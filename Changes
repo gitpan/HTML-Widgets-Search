@@ -1,5 +1,8 @@
 Revision history for Perl extension HTML::Widgets::Search.
 
+0.05 Tue Nov 2002
+    - Added prereq for DBI
+
 0.04	Fri May 26 16:33:31 MET DST 2000
 	- Added a very cool header method
 	- It works with SQL-Server 6.5, granted !
