@@ -17,7 +17,7 @@ require AutoLoader;
 @EXPORT = qw(
 	
 );
-$VERSION = '0.05';
+$VERSION = '0.06';
 
   
 for my $attr (qw( query field_id start limit form_fields dbh DEBUG
@@ -148,7 +148,8 @@ sub args_html {
 	$arg{start}=$self->{start} unless exists $arg{start};
 	my $ret='';
 	foreach (keys %{$self->{form_fields}}) {
-		next unless length $self->{form_fields}->{$_};
+		next unless exists $self->{form_fields}->{$_} 
+			&&length $self->{form_fields}->{$_};
 		next unless /^[a-z0-9_]*$/i; # must be a valid SQL table field name
 		$ret.="<INPUT TYPE=HIDDEN NAME=\"$_\" ".
 				" VALUE=\"$self->{form_fields}->{$_}\">";

@@ -1,4 +1,6 @@
 Revision history for Perl extension HTML::Widgets::Search.
+0.06 Fri Oct 22 11:15:11 CEST 2004
+	- Helps a warning for a undefined value
 
 0.05 Tue Nov 2002
     - Added prereq for DBI

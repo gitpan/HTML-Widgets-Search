@@ -3,3 +3,4 @@ MANIFEST
 Makefile.PL
 Search.pm
 test.pl
+META.yml                                 Module meta-data (added by MakeMaker)
