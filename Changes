@@ -1,0 +1,11 @@
+Revision history for Perl extension HTML::Widgets::Search.
+
+0.02	Tue Feb  1 10:50:38 CET 2000
+	- Added post form for prev and next
+	- Added functions : current_end and current start
+
+0.012 Thu Dec 16 16:25:05 CET 1999
+    - Fakes limit statement for DataBases that are not mysql
+
+0.01  Tue Sep 28 09:52:07 1999
+	- original version; created by h2xs 1.19
