@@ -17,7 +17,7 @@ require AutoLoader;
 @EXPORT = qw(
 	
 );
-$VERSION = '0.06';
+$VERSION = '0.07';
 
   
 for my $attr (qw( query field_id start limit form_fields dbh DEBUG

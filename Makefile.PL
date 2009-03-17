@@ -5,6 +5,7 @@ WriteMakefile(
     'NAME'	=> 'HTML::Widgets::Search',
     'VERSION_FROM' => 'Search.pm', # finds $VERSION
 	PREREQ_PM => {
-		DBI => '0.7'
+		DBI => '0.7',
+		URI => 0
 	}
 );
